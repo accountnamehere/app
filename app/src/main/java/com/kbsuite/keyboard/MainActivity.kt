@@ -20,6 +20,7 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import com.kbsuite.keyboard.clip.ClipLock
 
 class MainActivity : Activity() {
 
@@ -130,6 +131,20 @@ class MainActivity : Activity() {
         row(label, spinner, reset)
     }
 
+    private fun dropdown2(label: String, options: List<String>, current: Int, onPick: (Int) -> Unit) {
+        val spinner = Spinner(this)
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, options)
+        spinner.setSelection(current.coerceIn(0, options.size - 1))
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, v: View?, position: Int, id: Long) {
+                onPick(position)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        row(label, spinner, null)
+    }
+
     private fun build() {
         title("KeySuite")
 
@@ -166,6 +181,29 @@ class MainActivity : Activity() {
         toggle("Capture copied images", Prefs.CLIP_CAPTURE_IMAGES)
         toggle("Show images in clipboard", Prefs.CLIP_SHOW_IMAGES)
         toggle("Show clip titles", Prefs.CLIP_SHOW_TITLE)
+
+        section("CLIPBOARD LOCK")
+        dropdown2(
+            "Lock type",
+            listOf("None", "PIN", "Pattern", "Tap count", "Hidden spot"),
+            ClipLock.mode(this)
+        ) { ClipLock.setMode(this, it) }
+        val pin = EditText(this).apply {
+            hint = "Set PIN"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            setOnFocusChangeListener { _, focused ->
+                if (!focused && text.isNotBlank()) ClipLock.setSecret(this@MainActivity, text.toString())
+            }
+        }
+        row("PIN", pin, null)
+        val tapCount = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(ClipLock.tapTarget(this@MainActivity).toString())
+            setOnFocusChangeListener { _, focused ->
+                if (!focused) text.toString().toIntOrNull()?.let { ClipLock.setTapTarget(this@MainActivity, it) }
+            }
+        }
+        row("Tap count target", tapCount, null)
 
         section("FEEDBACK")
         toggle("Vibrate on keypress", Prefs.HAPTIC)

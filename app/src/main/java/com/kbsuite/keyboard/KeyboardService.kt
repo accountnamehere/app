@@ -18,8 +18,10 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import com.kbsuite.keyboard.clip.ClipItem
+import com.kbsuite.keyboard.clip.ClipLock
 import com.kbsuite.keyboard.clip.ClipPanel
 import com.kbsuite.keyboard.clip.ClipStore
+import com.kbsuite.keyboard.clip.LockPrompt
 import com.kbsuite.keyboard.repeat.RepeatPanel
 
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
@@ -160,6 +162,22 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             closeAllPanels()
             return
         }
+        closeAllPanels()
+        if (ClipLock.mode(this) != ClipLock.MODE_NONE) {
+            val lock = LockPrompt(
+                this,
+                view?.height ?: dp(220),
+                onUnlocked = { openClipPanel() },
+                onCancel = { closeAllPanels() }
+            )
+            bodyFrame.addView(lock)
+            return
+        }
+        openClipPanel()
+    }
+
+    private fun openClipPanel() {
+        val bodyFrame = body ?: return
         closeAllPanels()
         val panel = ClipPanel(
             this,
