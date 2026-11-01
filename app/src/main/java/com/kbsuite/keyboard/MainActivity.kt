@@ -171,6 +171,14 @@ class MainActivity : Activity() {
         toggle("Vibrate on keypress", Prefs.HAPTIC)
         toggle("Sound on keypress", Prefs.SOUND)
 
+        section("REPEAT SEND")
+        column.addView(TextView(this).apply {
+            text = "Open the 🔁 button on the keyboard toolbar while typing to use it. You always control Start and Stop yourself."
+            setTextColor(Color.parseColor("#6B7280"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(0, 0, 0, dp(8))
+        })
+
         section("TEST")
         column.addView(EditText(this).apply {
             hint = "Tap here to try the keyboard"

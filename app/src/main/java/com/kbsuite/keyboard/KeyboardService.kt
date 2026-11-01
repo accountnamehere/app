@@ -20,6 +20,7 @@ import android.widget.LinearLayout
 import com.kbsuite.keyboard.clip.ClipItem
 import com.kbsuite.keyboard.clip.ClipPanel
 import com.kbsuite.keyboard.clip.ClipStore
+import com.kbsuite.keyboard.repeat.RepeatPanel
 
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
@@ -27,6 +28,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var root: LinearLayout? = null
     private var body: FrameLayout? = null
     private var clipPanel: ClipPanel? = null
+    private var repeatPanel: RepeatPanel? = null
     private var page = PAGE_ALPHA
     private var shift = SHIFT_OFF
     private var lastShiftTap = 0L
@@ -91,6 +93,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             setOnClickListener { toggleClipPanel() }
         })
         toolbar.addView(android.widget.TextView(this).apply {
+            text = "🔁"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { toggleRepeatPanel() }
+        })
+        toolbar.addView(android.widget.TextView(this).apply {
             text = "↶"
             setTextColor(Color.WHITE)
             setPadding(dp(10), dp(6), dp(10), dp(6))
@@ -102,7 +110,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             setPadding(dp(10), dp(6), dp(10), dp(6))
             setOnClickListener { redo() }
         })
-        toolbar.addView(android.widget.View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         toolbar.addView(android.widget.TextView(this).apply {
             text = "⚙"
             setTextColor(Color.WHITE)
@@ -138,14 +146,21 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         return column
     }
 
+    private fun closeAllPanels() {
+        val bodyFrame = body ?: return
+        clipPanel?.let { bodyFrame.removeView(it) }
+        clipPanel = null
+        repeatPanel?.let { it.onDetach(); bodyFrame.removeView(it) }
+        repeatPanel = null
+    }
+
     private fun toggleClipPanel() {
         val bodyFrame = body ?: return
-        val existing = clipPanel
-        if (existing != null) {
-            bodyFrame.removeView(existing)
-            clipPanel = null
+        if (clipPanel != null) {
+            closeAllPanels()
             return
         }
+        closeAllPanels()
         val panel = ClipPanel(
             this,
             clipStore,
@@ -154,6 +169,23 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             onClose = { toggleClipPanel() }
         )
         clipPanel = panel
+        bodyFrame.addView(panel)
+    }
+
+    private fun toggleRepeatPanel() {
+        val bodyFrame = body ?: return
+        if (repeatPanel != null) {
+            closeAllPanels()
+            return
+        }
+        closeAllPanels()
+        val panel = RepeatPanel(
+            this,
+            view?.height ?: dp(220),
+            connectionProvider = { currentInputConnection },
+            onClose = { toggleRepeatPanel() }
+        )
+        repeatPanel = panel
         bodyFrame.addView(panel)
     }
 
