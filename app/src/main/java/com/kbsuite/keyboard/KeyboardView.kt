@@ -17,7 +17,7 @@ class KeyboardView(context: Context) : View(context) {
         fun onKeyDown(key: Key)
         fun onKeyUp(key: Key)
         fun onKeyRepeat(key: Key)
-        fun onKeyLongPress(key: Key): Boolean
+        fun onKeyLongPress(key: Key, index: Int): Boolean
     }
 
     class Palette(
@@ -73,6 +73,10 @@ class KeyboardView(context: Context) : View(context) {
     private val longPressRunnables = HashMap<Int, Runnable>()
     private var previewKey: Key? = null
     private var previewRect: RectF? = null
+    private var stripPointer = -1
+    private var stripIndex = 0
+    private var stripLeft = 0f
+    private var stripCell = 0f
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -165,17 +169,35 @@ class KeyboardView(context: Context) : View(context) {
         val pk = previewKey
         val pr = previewRect
         if (pk != null && pr != null) {
-            val bubbleW = pr.width() * 1.3f
-            val bubbleH = pr.height() * 1.6f
-            val cx = pr.centerX()
-            val bubble = RectF(cx - bubbleW / 2f, pr.top - bubbleH, cx + bubbleW / 2f, pr.top)
-            fill.color = palette.keyPressed
-            canvas.drawRoundRect(bubble, radius, radius, fill)
-            val text = if (longPressed.isNotEmpty() && pk.alt.isNotEmpty()) pk.alt.take(1) else labelFor(pk)
-            textPaint.color = palette.text
-            textPaint.textSize = bubble.height() * 0.5f
-            val y = bubble.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
-            canvas.drawText(text, bubble.centerX(), y, textPaint)
+            if (stripPointer >= 0 && pk.alt.length > 1) {
+                val n = pk.alt.length
+                val strip = RectF(stripLeft, maxOf(pr.top - pr.height() * 1.4f, 0f), stripLeft + stripCell * n, maxOf(pr.top - pr.height() * 1.4f, 0f) + pr.height() * 1.2f)
+                fill.color = palette.special
+                canvas.drawRoundRect(strip, radius, radius, fill)
+                for (i in 0 until n) {
+                    val cell = RectF(strip.left + i * stripCell + gap, strip.top + gap, strip.left + (i + 1) * stripCell - gap, strip.bottom - gap)
+                    if (i == stripIndex) {
+                        fill.color = palette.accent
+                        canvas.drawRoundRect(cell, radius, radius, fill)
+                    }
+                    textPaint.color = if (i == stripIndex) palette.background else palette.text
+                    textPaint.textSize = cell.height() * 0.5f
+                    val ty = cell.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
+                    canvas.drawText(pk.alt[i].toString(), cell.centerX(), ty, textPaint)
+                }
+            } else {
+                val bubbleW = pr.width() * 1.3f
+                val bubbleH = pr.height() * 1.6f
+                val cx = pr.centerX()
+                val bubble = RectF(cx - bubbleW / 2f, pr.top - bubbleH, cx + bubbleW / 2f, pr.top)
+                fill.color = palette.keyPressed
+                canvas.drawRoundRect(bubble, radius, radius, fill)
+                val text = if (longPressed.isNotEmpty() && pk.alt.isNotEmpty()) pk.alt.take(1) else labelFor(pk)
+                textPaint.color = palette.text
+                textPaint.textSize = bubble.height() * 0.5f
+                val y = bubble.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
+                canvas.drawText(text, bubble.centerX(), y, textPaint)
+            }
         }
     }
 
@@ -214,9 +236,19 @@ class KeyboardView(context: Context) : View(context) {
             repeaters[pointerId] = runnable
             handler.postDelayed(runnable, repeatDelayMs)
         }
-        if (key.alt.isNotEmpty() || key.label.length > 1) {
+        if (key.alt.isNotEmpty() || key.code == Codes.ENTER) {
             val runnable = Runnable {
                 longPressed.add(pointerId)
+                if (key.alt.length > 1) {
+                    val rect = laid.firstOrNull { it.first == key }?.second
+                    if (rect != null) {
+                        stripPointer = pointerId
+                        stripIndex = 0
+                        stripCell = rect.height() * 0.95f
+                        val total = stripCell * key.alt.length
+                        stripLeft = (rect.centerX() - total / 2f).coerceIn(0f, maxOf(width - total, 0f))
+                    }
+                }
                 invalidate()
             }
             longPressRunnables[pointerId] = runnable
@@ -229,14 +261,16 @@ class KeyboardView(context: Context) : View(context) {
         repeaters.remove(pointerId)?.let { handler.removeCallbacks(it) }
         longPressRunnables.remove(pointerId)?.let { handler.removeCallbacks(it) }
         val wasLong = longPressed.remove(pointerId)
+        val chosen = if (stripPointer == pointerId) stripIndex else 0
+        if (stripPointer == pointerId) stripPointer = -1
         val key = active.remove(pointerId)
         if (active.isEmpty()) {
             previewKey = null
             previewRect = null
         }
         if (key != null && !cancelled) {
-            if (wasLong && key.alt.isNotEmpty()) {
-                if (listener?.onKeyLongPress(key) != true) listener?.onKeyUp(key)
+            if (wasLong) {
+                if (listener?.onKeyLongPress(key, chosen) != true) listener?.onKeyUp(key)
             } else {
                 listener?.onKeyUp(key)
             }
@@ -253,7 +287,22 @@ class KeyboardView(context: Context) : View(context) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 release(event.getPointerId(event.actionIndex), false)
             }
+            MotionEvent.ACTION_MOVE -> {
+                if (stripPointer >= 0) {
+                    val index = event.findPointerIndex(stripPointer)
+                    val key = active[stripPointer]
+                    if (index >= 0 && key != null && key.alt.length > 1 && stripCell > 0f) {
+                        val raw = ((event.getX(index) - stripLeft) / stripCell).toInt()
+                        val next = raw.coerceIn(0, key.alt.length - 1)
+                        if (next != stripIndex) {
+                            stripIndex = next
+                            invalidate()
+                        }
+                    }
+                }
+            }
             MotionEvent.ACTION_CANCEL -> {
+                stripPointer = -1
                 active.keys.toList().forEach { release(it, true) }
             }
         }

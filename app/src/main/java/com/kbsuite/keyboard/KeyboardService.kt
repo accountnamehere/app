@@ -341,13 +341,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (key.code == Codes.DELETE) doDelete()
     }
 
-    override fun onKeyLongPress(key: Key): Boolean {
+    override fun onKeyLongPress(key: Key, index: Int): Boolean {
         if (key.code == Codes.ENTER) {
             currentInputConnection?.commitText("\n", 1)
             return true
         }
         if (key.alt.isEmpty()) return false
-        commit(key.alt.take(1))
+        commit(key.alt[index.coerceIn(0, key.alt.length - 1)].toString())
         return true
     }
 
