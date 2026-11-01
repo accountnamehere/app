@@ -16,6 +16,9 @@ object Prefs {
     const val DOUBLE_TAP_MS = "double_tap_ms"
     const val REPEAT_DELAY_MS = "repeat_delay_ms"
     const val REPEAT_RATE_MS = "repeat_rate_ms"
+    const val LONG_PRESS_MS = "long_press_ms"
+    const val KEY_POPUP = "key_popup"
+    const val ENTER_SENDS = "enter_sends"
 
     private val defaults: Map<String, Any> = mapOf(
         THEME to 1,
@@ -27,7 +30,10 @@ object Prefs {
         NUMBER_ROW to true,
         DOUBLE_TAP_MS to 300,
         REPEAT_DELAY_MS to 350,
-        REPEAT_RATE_MS to 45
+        REPEAT_RATE_MS to 45,
+        LONG_PRESS_MS to 350,
+        KEY_POPUP to true,
+        ENTER_SENDS to true
     )
 
     fun store(context: Context): SharedPreferences =

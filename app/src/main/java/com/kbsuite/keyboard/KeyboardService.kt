@@ -44,6 +44,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         v.haptic = Prefs.bool(this, Prefs.HAPTIC)
         v.repeatDelayMs = Prefs.int(this, Prefs.REPEAT_DELAY_MS).toLong()
         v.repeatRateMs = Prefs.int(this, Prefs.REPEAT_RATE_MS).toLong().coerceAtLeast(5L)
+        v.longPressMs = Prefs.int(this, Prefs.LONG_PRESS_MS).toLong().coerceAtLeast(100L)
+        v.popupEnabled = Prefs.bool(this, Prefs.KEY_POPUP)
     }
 
     private fun applyPage() {
@@ -86,6 +88,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun doEnter() {
         val ic = currentInputConnection ?: return
+        if (!Prefs.bool(this, Prefs.ENTER_SENDS)) {
+            ic.commitText("\n", 1)
+            return
+        }
         val options = currentInputEditorInfo?.imeOptions ?: 0
         val action = options and EditorInfo.IME_MASK_ACTION
         val noEnterAction = (options and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
@@ -119,6 +125,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onKeyRepeat(key: Key) {
         if (key.code == Codes.DELETE) doDelete()
+    }
+
+    override fun onKeyLongPress(key: Key): Boolean {
+        if (key.code == Codes.ENTER) {
+            currentInputConnection?.commitText("\n", 1)
+            return true
+        }
+        if (key.alt.isEmpty()) return false
+        commit(key.alt.take(1))
+        return true
     }
 
     override fun onKeyUp(key: Key) {

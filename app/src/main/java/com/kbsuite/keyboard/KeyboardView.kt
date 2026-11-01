@@ -17,6 +17,7 @@ class KeyboardView(context: Context) : View(context) {
         fun onKeyDown(key: Key)
         fun onKeyUp(key: Key)
         fun onKeyRepeat(key: Key)
+        fun onKeyLongPress(key: Key): Boolean
     }
 
     class Palette(
@@ -61,11 +62,17 @@ class KeyboardView(context: Context) : View(context) {
     var haptic: Boolean = true
     var repeatDelayMs: Long = 350L
     var repeatRateMs: Long = 45L
+    var longPressMs: Long = 350L
+    var popupEnabled: Boolean = true
 
     private val handler = Handler(Looper.getMainLooper())
     private val laid = ArrayList<Pair<Key, RectF>>()
     private val active = HashMap<Int, Key>()
     private val repeaters = HashMap<Int, Runnable>()
+    private val longPressed = HashSet<Int>()
+    private val longPressRunnables = HashMap<Int, Runnable>()
+    private var previewKey: Key? = null
+    private var previewRect: RectF? = null
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -145,6 +152,21 @@ class KeyboardView(context: Context) : View(context) {
                 canvas.drawText(key.alt.take(1), rect.right - gap * 2f, rect.top + rect.height() * 0.30f, hintPaint)
             }
         }
+        val pk = previewKey
+        val pr = previewRect
+        if (pk != null && pr != null) {
+            val bubbleW = pr.width() * 1.3f
+            val bubbleH = pr.height() * 1.6f
+            val cx = pr.centerX()
+            val bubble = RectF(cx - bubbleW / 2f, pr.top - bubbleH, cx + bubbleW / 2f, pr.top)
+            fill.color = palette.keyPressed
+            canvas.drawRoundRect(bubble, radius, radius, fill)
+            val text = if (longPressed.isNotEmpty() && pk.alt.isNotEmpty()) pk.alt.take(1) else labelFor(pk)
+            textPaint.color = palette.text
+            textPaint.textSize = bubble.height() * 0.5f
+            val y = bubble.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
+            canvas.drawText(text, bubble.centerX(), y, textPaint)
+        }
     }
 
     private fun keyAt(x: Float, y: Float): Key? {
@@ -168,6 +190,10 @@ class KeyboardView(context: Context) : View(context) {
         active[pointerId] = key
         if (haptic) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         listener?.onKeyDown(key)
+        if (popupEnabled && key.code != Codes.SPACE && key.code != Codes.SPACER) {
+            previewKey = key
+            previewRect = laid.firstOrNull { it.first == key }?.second
+        }
         if (key.repeat) {
             val runnable = object : Runnable {
                 override fun run() {
@@ -178,13 +204,33 @@ class KeyboardView(context: Context) : View(context) {
             repeaters[pointerId] = runnable
             handler.postDelayed(runnable, repeatDelayMs)
         }
+        if (key.alt.isNotEmpty() || key.label.length > 1) {
+            val runnable = Runnable {
+                longPressed.add(pointerId)
+                invalidate()
+            }
+            longPressRunnables[pointerId] = runnable
+            handler.postDelayed(runnable, longPressMs)
+        }
         invalidate()
     }
 
     private fun release(pointerId: Int, cancelled: Boolean) {
         repeaters.remove(pointerId)?.let { handler.removeCallbacks(it) }
+        longPressRunnables.remove(pointerId)?.let { handler.removeCallbacks(it) }
+        val wasLong = longPressed.remove(pointerId)
         val key = active.remove(pointerId)
-        if (key != null && !cancelled) listener?.onKeyUp(key)
+        if (active.isEmpty()) {
+            previewKey = null
+            previewRect = null
+        }
+        if (key != null && !cancelled) {
+            if (wasLong && key.alt.isNotEmpty()) {
+                if (listener?.onKeyLongPress(key) != true) listener?.onKeyUp(key)
+            } else {
+                listener?.onKeyUp(key)
+            }
+        }
         invalidate()
     }
 
@@ -208,7 +254,12 @@ class KeyboardView(context: Context) : View(context) {
         super.onDetachedFromWindow()
         repeaters.values.forEach { handler.removeCallbacks(it) }
         repeaters.clear()
+        longPressRunnables.values.forEach { handler.removeCallbacks(it) }
+        longPressRunnables.clear()
+        longPressed.clear()
         active.clear()
+        previewKey = null
+        previewRect = null
     }
 
     companion object {

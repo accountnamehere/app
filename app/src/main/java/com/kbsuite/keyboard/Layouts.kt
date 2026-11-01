@@ -34,7 +34,7 @@ object Layouts {
     fun alpha(numberRow: Boolean): List<List<Key>> {
         val rows = ArrayList<List<Key>>()
         if (numberRow) rows.add(numberRow())
-        rows.add(letters("qwertyuiop", "1234567890"))
+        rows.add(letters("qwertyuiop", if (numberRow) "" else "1234567890"))
         rows.add(
             listOf(Key("", Codes.SPACER, 0.5f)) +
                 letters("asdfghjkl") +

@@ -154,9 +154,12 @@ class MainActivity : Activity() {
         section("TYPING")
         toggle("Auto-capitalization", Prefs.AUTO_CAPS)
         toggle("Double space for full stop", Prefs.DOUBLE_SPACE_PERIOD)
+        toggle("Enter key sends", Prefs.ENTER_SENDS)
+        toggle("Key popup preview", Prefs.KEY_POPUP)
         number("Double tap window (ms)", Prefs.DOUBLE_TAP_MS)
         number("Key repeat delay (ms)", Prefs.REPEAT_DELAY_MS)
         number("Key repeat rate (ms)", Prefs.REPEAT_RATE_MS)
+        number("Long press delay (ms)", Prefs.LONG_PRESS_MS)
 
         section("FEEDBACK")
         toggle("Vibrate on keypress", Prefs.HAPTIC)
