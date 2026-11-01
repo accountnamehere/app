@@ -19,6 +19,10 @@ object Prefs {
     const val LONG_PRESS_MS = "long_press_ms"
     const val KEY_POPUP = "key_popup"
     const val ENTER_SENDS = "enter_sends"
+    const val CLIP_MAX = "clip_max"
+    const val CLIP_CAPTURE_IMAGES = "clip_capture_images"
+    const val CLIP_SHOW_IMAGES = "clip_show_images"
+    const val CLIP_SHOW_TITLE = "clip_show_title"
 
     private val defaults: Map<String, Any> = mapOf(
         THEME to 1,
@@ -33,7 +37,11 @@ object Prefs {
         REPEAT_RATE_MS to 45,
         LONG_PRESS_MS to 350,
         KEY_POPUP to true,
-        ENTER_SENDS to true
+        ENTER_SENDS to true,
+        CLIP_MAX to 0,
+        CLIP_CAPTURE_IMAGES to true,
+        CLIP_SHOW_IMAGES to true,
+        CLIP_SHOW_TITLE to true
     )
 
     fun store(context: Context): SharedPreferences =

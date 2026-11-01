@@ -1,29 +1,183 @@
 package com.kbsuite.keyboard
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
 import android.os.SystemClock
 import android.text.InputType
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import com.kbsuite.keyboard.clip.ClipItem
+import com.kbsuite.keyboard.clip.ClipPanel
+import com.kbsuite.keyboard.clip.ClipStore
 
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private var view: KeyboardView? = null
+    private var root: LinearLayout? = null
+    private var body: FrameLayout? = null
+    private var clipPanel: ClipPanel? = null
     private var page = PAGE_ALPHA
     private var shift = SHIFT_OFF
     private var lastShiftTap = 0L
     private var lastSpaceTap = 0L
+    private var lastInserted = ""
+    private var lastDeleted = ""
+    private val clipStore by lazy { ClipStore(this) }
+    private var ignoreNextClipChange = false
+
+    private val systemClipListener = ClipboardManager.OnPrimaryClipChangedListener {
+        if (ignoreNextClipChange) {
+            ignoreNextClipChange = false
+            return@OnPrimaryClipChangedListener
+        }
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = cm.primaryClip ?: return@OnPrimaryClipChangedListener
+        if (clip.itemCount == 0) return@OnPrimaryClipChangedListener
+        val text = clip.getItemAt(0).coerceToText(this)?.toString().orEmpty()
+        if (text.isNotBlank()) {
+            clipStore.add(text, Prefs.int(this, Prefs.CLIP_MAX))
+            clipPanel?.refresh()
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).addPrimaryClipChangedListener(systemClipListener)
+    }
+
+    override fun onDestroy() {
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).removePrimaryClipChangedListener(systemClipListener)
+        super.onDestroy()
+    }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun toolbarButton(label: String, action: () -> Unit): ImageButton {
+        return ImageButton(this).apply {
+            background = null
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            contentDescription = label
+            setImageDrawable(null)
+            setOnClickListener { action() }
+        }
+    }
 
     override fun onCreateInputView(): View {
         val v = KeyboardView(this)
         v.listener = this
         view = v
+
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#0C0E10"))
+            setPadding(dp(4), dp(2), dp(4), dp(2))
+        }
+        toolbar.addView(android.widget.TextView(this).apply {
+            text = "📋"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { toggleClipPanel() }
+        })
+        toolbar.addView(android.widget.TextView(this).apply {
+            text = "↶"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { undo() }
+        })
+        toolbar.addView(android.widget.TextView(this).apply {
+            text = "↷"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { redo() }
+        })
+        toolbar.addView(android.widget.View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        toolbar.addView(android.widget.TextView(this).apply {
+            text = "⚙"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener {
+                val intent = android.content.Intent(this@KeyboardService, MainActivity::class.java)
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            }
+        })
+        toolbar.addView(android.widget.TextView(this).apply {
+            text = "⌨"
+            setTextColor(Color.WHITE)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener {
+                (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
+            }
+        })
+
+        val bodyFrame = FrameLayout(this)
+        bodyFrame.addView(v)
+        body = bodyFrame
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        column.addView(toolbar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(32)))
+        column.addView(bodyFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        root = column
+
         applyPrefs()
         applyPage()
-        return v
+        return column
+    }
+
+    private fun toggleClipPanel() {
+        val bodyFrame = body ?: return
+        val existing = clipPanel
+        if (existing != null) {
+            bodyFrame.removeView(existing)
+            clipPanel = null
+            return
+        }
+        val panel = ClipPanel(
+            this,
+            clipStore,
+            view?.height ?: dp(220),
+            onPick = { item -> insertClip(item) },
+            onClose = { toggleClipPanel() }
+        )
+        clipPanel = panel
+        bodyFrame.addView(panel)
+    }
+
+    private fun insertClip(item: ClipItem) {
+        clipStore.setPasteBuffer(item)
+        currentInputConnection?.commitText(item.text, 1)
+    }
+
+    private fun undo() {
+        val ic = currentInputConnection ?: return
+        if (lastInserted.isNotEmpty()) {
+            ic.deleteSurroundingText(lastInserted.length, 0)
+            lastDeleted = lastInserted
+            lastInserted = ""
+        }
+    }
+
+    private fun redo() {
+        val ic = currentInputConnection ?: return
+        if (lastDeleted.isNotEmpty()) {
+            ic.commitText(lastDeleted, 1)
+            lastInserted = lastDeleted
+            lastDeleted = ""
+        }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -110,11 +264,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         } else {
             ic.deleteSurroundingText(1, 0)
         }
+        lastInserted = ""
+        lastDeleted = ""
     }
 
     private fun commit(text: String) {
         val ic = currentInputConnection ?: return
         ic.commitText(text, 1)
+        lastInserted += text
+        lastDeleted = ""
         if (shift == SHIFT_ONCE) setShift(SHIFT_OFF)
         if (text.length == 1 && !text[0].isLetter()) autoCapitalize()
     }

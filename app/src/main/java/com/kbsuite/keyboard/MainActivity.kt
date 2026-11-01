@@ -161,6 +161,12 @@ class MainActivity : Activity() {
         number("Key repeat rate (ms)", Prefs.REPEAT_RATE_MS)
         number("Long press delay (ms)", Prefs.LONG_PRESS_MS)
 
+        section("CLIPBOARD")
+        number("Clip history max (0 = unlimited)", Prefs.CLIP_MAX)
+        toggle("Capture copied images", Prefs.CLIP_CAPTURE_IMAGES)
+        toggle("Show images in clipboard", Prefs.CLIP_SHOW_IMAGES)
+        toggle("Show clip titles", Prefs.CLIP_SHOW_TITLE)
+
         section("FEEDBACK")
         toggle("Vibrate on keypress", Prefs.HAPTIC)
         toggle("Sound on keypress", Prefs.SOUND)
