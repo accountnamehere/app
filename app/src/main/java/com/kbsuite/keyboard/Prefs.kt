@@ -23,6 +23,10 @@ object Prefs {
     const val CLIP_CAPTURE_IMAGES = "clip_capture_images"
     const val CLIP_SHOW_IMAGES = "clip_show_images"
     const val CLIP_SHOW_TITLE = "clip_show_title"
+    const val APP_THEME = "app_theme"
+    const val KEY_GAP_DP = "key_gap_dp"
+    const val KEY_RADIUS_DP = "key_radius_dp"
+    const val SHOW_TOOLBAR = "show_toolbar"
 
     private val defaults: Map<String, Any> = mapOf(
         THEME to 1,
@@ -41,7 +45,11 @@ object Prefs {
         CLIP_MAX to 0,
         CLIP_CAPTURE_IMAGES to true,
         CLIP_SHOW_IMAGES to true,
-        CLIP_SHOW_TITLE to true
+        CLIP_SHOW_TITLE to true,
+        APP_THEME to 1,
+        KEY_GAP_DP to 3,
+        KEY_RADIUS_DP to 7,
+        SHOW_TOOLBAR to true
     )
 
     fun store(context: Context): SharedPreferences =

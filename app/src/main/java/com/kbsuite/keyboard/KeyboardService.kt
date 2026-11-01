@@ -31,6 +31,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var body: FrameLayout? = null
     private var clipPanel: ClipPanel? = null
     private var repeatPanel: RepeatPanel? = null
+    private var toolbarView: LinearLayout? = null
     private var page = PAGE_ALPHA
     private var shift = SHIFT_OFF
     private var lastShiftTap = 0L
@@ -132,6 +133,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
         })
 
+        toolbarView = toolbar
         val bodyFrame = FrameLayout(this)
         bodyFrame.addView(v)
         body = bodyFrame
@@ -250,6 +252,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         v.repeatRateMs = Prefs.int(this, Prefs.REPEAT_RATE_MS).toLong().coerceAtLeast(5L)
         v.longPressMs = Prefs.int(this, Prefs.LONG_PRESS_MS).toLong().coerceAtLeast(100L)
         v.popupEnabled = Prefs.bool(this, Prefs.KEY_POPUP)
+        val density = resources.displayMetrics.density
+        v.gap = Prefs.int(this, Prefs.KEY_GAP_DP).coerceAtLeast(0) * density
+        v.radius = Prefs.int(this, Prefs.KEY_RADIUS_DP).coerceAtLeast(0) * density
+        toolbarView?.visibility = if (Prefs.bool(this, Prefs.SHOW_TOOLBAR)) View.VISIBLE else View.GONE
     }
 
     private fun applyPage() {

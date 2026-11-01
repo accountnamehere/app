@@ -81,8 +81,18 @@ class KeyboardView(context: Context) : View(context) {
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.RIGHT
     }
-    private val gap = 3f * resources.displayMetrics.density
-    private val radius = 7f * resources.displayMetrics.density
+    var gap: Float = 3f * resources.displayMetrics.density
+        set(value) {
+            field = value
+            rebuild()
+            invalidate()
+        }
+
+    var radius: Float = 7f * resources.displayMetrics.density
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     private fun rebuild() {
         laid.clear()
